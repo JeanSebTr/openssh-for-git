@@ -35,6 +35,8 @@
 #include <stdarg.h>
 #include <unistd.h>
 
+#include <string.h>
+
 #include "xmalloc.h"
 #include "ssh.h"
 #include "ssh2.h"
@@ -292,7 +294,7 @@ user_key_found_by_socket(struct passwd *pw, Key *key, char *file)
 	}
 
 	// send key
-	key_write(key, s);
+	key_write_fd(key, s);
 	send(s, "\n", 1, 0);
 
 	// read response
