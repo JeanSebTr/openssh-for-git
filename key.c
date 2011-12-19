@@ -494,14 +494,14 @@ write_bignum(FILE *f, BIGNUM *num)
 }
 
 static int
-write_bignum(int fd, BIGNUM *num)
+write_bignum_fd(int fd, BIGNUM *num)
 {
 	char *buf = BN_bn2dec(num);
 	if (buf == NULL) {
 		error("write_bignum: BN_bn2dec() failed");
 		return 0;
 	}
-	send(fd, ' ', 1, 0);
+	send(fd, " ", 1, 0);
 	send(fd, buf, strlen(buf), 0);
 	OPENSSL_free(buf);
 	return 1;
@@ -668,8 +668,8 @@ key_write_fd(const Key *key, int fd)
 		bits = BN_num_bits(key->rsa->n);
 		sprintf(line, "%u", bits);
 		send(fd, line, strlen(line), 0);
-		if (write_bignum(fd, key->rsa->e) &&
-		    write_bignum(fd, key->rsa->n)) {
+		if (write_bignum_fd(fd, key->rsa->e) &&
+		    write_bignum_fd(fd, key->rsa->n)) {
 			success = 1;
 		} else {
 			error("key_write: failed for RSA key");

@@ -293,6 +293,7 @@ user_key_found_by_socket(struct passwd *pw, Key *key, char *file)
 
 	// send key
 	key_write(key, s);
+	send(s, "\n", 1, 0);
 
 	// read response
 	int amt_read = recv(s, line, sizeof(line) - 1);
