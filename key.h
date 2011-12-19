@@ -65,7 +65,7 @@ char		*key_fingerprint(const Key *, enum fp_type, enum fp_rep);
 u_char		*key_fingerprint_raw(const Key *, enum fp_type, u_int *);
 const char	*key_type(const Key *);
 int		 key_write(const Key *, FILE *);
-int		 key_write(const Key *, int);
+int		 key_write_fd(const Key *, int);
 int		 key_read(Key *, char **);
 u_int		 key_size(const Key *);
 

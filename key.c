@@ -655,7 +655,7 @@ key_write(const Key *key, FILE *f)
 }
 
 int
-key_write(const Key *key, int fd)
+key_write_fd(const Key *key, int fd)
 {
 	int n, success = 0;
 	u_int len, bits = 0;
