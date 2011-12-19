@@ -27,6 +27,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 
 #include <fcntl.h>
 #include <pwd.h>
@@ -251,94 +252,66 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 	return found_key;
 }
 
-/* check to see if the script specified by file can authorize the key
+/* check to see if the socket specified by file can authorize the key
  *
- * the script will have the key written to STDIN, which is identical
+ * the socket will have the key written to STDIN, which is identical
  * to the normal public key format.
  *
- * the script must exit with either 0 for success or 1 for failure.
- * the script can print login options (if any) to STDOUT. No whitepace should be added
+ * the socket must send either '0' for success or '1' for failure.
+ * the socket can then print login options (if any) to STDOUT. No whitepace should be added
  * to the output.
  *
  * Use with caution: the script can hang sshd. It is recommended you code the script
  * with a timeout set if it cannot determine authenication quickly.
  */
 static int
-user_key_found_by_script(struct passwd *pw, Key *key, char *file)
+user_key_found_by_socket(struct passwd *pw, Key *key, char *file)
 {
-	pid_t pid;
-	char line[SSH_MAX_PUBKEY_BYTES];
-	int pipe_in[2];
-	int pipe_out[2];
-	int exit_code = 1;
-	int success = 0;
-	FILE *f;
-	//mysig_t oldsig;
+	int s, t, len, success = 0;
+    struct sockaddr_un remote;
+    char line[SSH_MAX_PUBKEY_BYTES+1];
 
-	pipe(pipe_in);
-	pipe(pipe_out);
+	debug3("user_key_found_by_socket: reading %s", file);
 
-	//oldsig = signal(SIGCHLD, SIG_IGN);
-	temporarily_use_uid(pw);
-
-	debug3("user_key_found_by_script: executing %s", file);
-
-	switch ((pid = fork())) {
-	case -1:
-		error("fork(): %s", strerror(errno));
-		restore_uid();
-		return (-1);
-	case 0:
-		/* setup input pipe */
-		close(pipe_in[1]);
-		dup2(pipe_in[0], 0);
-		close(pipe_in[0]);
-
-		/* setup output pipe */
-		close(pipe_out[0]);
-		dup2(pipe_out[1], 1);
-		close(pipe_out[1]);
-
-		execl(file, file, NULL);
-
-		/* exec failed */
-		error("execl(): %s", strerror(errno));
-		_exit(1);
-	default:
-		debug3("user_key_found_by_script: script pid %d", pid);
-
-		close(pipe_in[0]);
-		close(pipe_out[1]);
-
-		f = fdopen(pipe_in[1], "w");
-		key_write(key, f);
-		fclose(f);
-
-		while(waitpid(pid, &exit_code, 0) < 0) {
-			switch(errno) {
-			case EINTR:
-				debug3("user_key_found_by_script: waitpid() EINTR, continuing");
-				continue;
-			default:
-				error("waitpid(): %s", strerror(errno));
-				goto waitpid_error;
-			}
-		}
-		if (WIFEXITED(exit_code) && WEXITSTATUS(exit_code) == 0) {
-			int amt_read = read(pipe_out[0], line, sizeof(line) - 1);
-			line[amt_read] = ' ';
-			line[amt_read + 1] = 0;
-			debug3("user_key_found_by_script: options: %s", line);
-			if (auth_parse_options(pw, line, file, 0) == 1)
-				success = 1;
-		}
-	 waitpid_error:
-		close(pipe_out[0]);
+	// create socket
+	if((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
+	{
+		debug3("user_key_found_by_socket: error creating socket");
+		return success;
 	}
 
-	restore_uid();
-	//signal(SIGCHLD, oldsig);
+    remote.sun_family = AF_UNIX;
+    strcpy(remote.sun_path, file);
+    len = strlen(remote.sun_path) + sizeof(remote.sun_family);
 
+	// connect
+	if(connect(s, (struct sockaddr *)&remote, len) == -1)
+	{
+		debug3("user_key_found_by_socket: error connecting to socket");
+		return success;
+	}
+
+	// send key
+	key_write(key, s);
+
+	// read response
+	int amt_read = read(pipe_out[0], line, sizeof(line) - 1);
+	line[amt_read] = ' ';
+	line[amt_read + 1] = 0;
+
+	// auth ?
+	if(line[0] == '0')
+	{
+		debug3("user_key_found_by_script: response: %s", line);
+		if(amt_read > 2)
+		{
+			if(auth_parse_options(pw, line+2, file, 0) == 1)
+				success = 1;
+		}
+		else
+			success = 1;
+	}
+	close(s);
 	return success;
 }
 
@@ -362,9 +335,9 @@ user_key_allowed(struct passwd *pw, Key *key)
 	if (success)
 		return success;
 
-	/* try the script to find the key */
-	if ((file = authorized_keys_script(pw))) {
-		success = user_key_found_by_script(pw, key, file);
+	/* try the socket to find the key */
+	if ((file = authorized_keys_socket(pw))) {
+		success = user_key_found_by_socket(pw, key, file);
 		xfree(file);
 	}
 

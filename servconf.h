@@ -140,7 +140,7 @@ typedef struct {
 	char   *authorized_keys_file;	/* File containing public keys */
 	char   *authorized_keys_file2;
 
-	char   *authorized_keys_script;
+	char   *authorized_keys_socket;
 
 	char   *adm_forced_command;
 

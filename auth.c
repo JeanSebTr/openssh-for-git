@@ -361,10 +361,10 @@ authorized_keys_file2(struct passwd *pw)
 }
 
 char *
-authorized_keys_script(struct passwd *pw)
+authorized_keys_socket(struct passwd *pw)
 {
-	if (options.authorized_keys_script)
-		return expand_authorized_keys(options.authorized_keys_script, pw);
+	if (options.authorized_keys_socket)
+		return expand_authorized_keys(options.authorized_keys_socket, pw);
 	else
 		return NULL;
 }
