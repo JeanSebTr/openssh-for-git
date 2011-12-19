@@ -493,6 +493,20 @@ write_bignum(FILE *f, BIGNUM *num)
 	return 1;
 }
 
+static int
+write_bignum(int fd, BIGNUM *num)
+{
+	char *buf = BN_bn2dec(num);
+	if (buf == NULL) {
+		error("write_bignum: BN_bn2dec() failed");
+		return 0;
+	}
+	send(fd, ' ', 1, 0);
+	send(fd, buf, strlen(buf), 0);
+	OPENSSL_free(buf);
+	return 1;
+}
+
 /* returns 1 ok, -1 error */
 int
 key_read(Key *ret, char **cpp)
@@ -632,6 +646,42 @@ key_write(const Key *key, FILE *f)
 		n = uuencode(blob, len, uu, 2*len);
 		if (n > 0) {
 			fprintf(f, "%s %s", key_ssh_name(key), uu);
+			success = 1;
+		}
+		xfree(blob);
+		xfree(uu);
+	}
+	return success;
+}
+
+int
+key_write(const Key *key, int fd)
+{
+	int n, success = 0;
+	u_int len, bits = 0;
+	u_char *blob;
+	char *uu;
+	char line[8192];
+
+	if (key->type == KEY_RSA1 && key->rsa != NULL) {
+		/* size of modulus 'n' */
+		bits = BN_num_bits(key->rsa->n);
+		sprintf(line, "%u", bits);
+		send(fd, line, strlen(line), 0);
+		if (write_bignum(fd, key->rsa->e) &&
+		    write_bignum(fd, key->rsa->n)) {
+			success = 1;
+		} else {
+			error("key_write: failed for RSA key");
+		}
+	} else if ((key->type == KEY_DSA && key->dsa != NULL) ||
+	    (key->type == KEY_RSA && key->rsa != NULL)) {
+		key_to_blob(key, &blob, &len);
+		uu = xmalloc(2*len);
+		n = uuencode(blob, len, uu, 2*len);
+		if (n > 0) {
+			sprintf(line, "%s %s", key_ssh_name(key), uu);
+			send(fd, line, strlen(line), 0);
 			success = 1;
 		}
 		xfree(blob);

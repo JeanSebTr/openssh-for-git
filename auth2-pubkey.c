@@ -269,7 +269,7 @@ user_key_found_by_socket(struct passwd *pw, Key *key, char *file)
 {
 	int s, t, len, success = 0;
     struct sockaddr_un remote;
-    char line[SSH_MAX_PUBKEY_BYTES+1];
+    char line[SSH_MAX_PUBKEY_BYTES];
 
 	debug3("user_key_found_by_socket: reading %s", file);
 
@@ -295,7 +295,7 @@ user_key_found_by_socket(struct passwd *pw, Key *key, char *file)
 	key_write(key, s);
 
 	// read response
-	int amt_read = read(pipe_out[0], line, sizeof(line) - 1);
+	int amt_read = recv(s, line, sizeof(line) - 1);
 	line[amt_read] = ' ';
 	line[amt_read + 1] = 0;
 
