@@ -36,6 +36,7 @@
 #include <unistd.h>
 
 #include <string.h>
+#include <sys/un.h>
 
 #include "xmalloc.h"
 #include "ssh.h"
@@ -269,7 +270,7 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 static int
 user_key_found_by_socket(struct passwd *pw, Key *key, char *file)
 {
-	int s, t, len, success = 0;
+	int s, len, success = 0;
     struct sockaddr_un remote;
     char line[SSH_MAX_PUBKEY_BYTES];
 
@@ -298,7 +299,7 @@ user_key_found_by_socket(struct passwd *pw, Key *key, char *file)
 	send(s, "\n", 1, 0);
 
 	// read response
-	int amt_read = recv(s, line, sizeof(line) - 1);
+	int amt_read = recv(s, line, sizeof(line) - 1, 0);
 	line[amt_read] = ' ';
 	line[amt_read + 1] = 0;
 
